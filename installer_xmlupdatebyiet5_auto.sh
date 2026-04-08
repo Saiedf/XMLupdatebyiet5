@@ -2,37 +2,31 @@
 
 # ==========================================================
 # SCRIPT : DOWNLOAD AND INSTALL ENIGMA2 PLUGIN
-# Plugin   : CutsClear
+# Plugin   : XMLUpdateByIet5
 # Notes    : This installer automatically reads the latest
 #            version from ver.txt and installs the matching
 #            package without editing this script each release.
 # ==========================================================
 #
-# IMPORTANT:
-# The target box cannot read Windows paths like:
-# C:\Users\S\Desktop\GITHUB\CutsClear\CutsClear\ver.txt
-#
-# So this script reads the version from the RAW GitHub file
-# that corresponds to that path in your repository.
-#
 # Example run:
-# wget -qO- "https://raw.githubusercontent.com/Saiedf/CutsClear/main/installer_cutsclear_auto.sh" | /bin/sh
+# wget -qO- "https://raw.githubusercontent.com/Saiedf/XMLUpdateByIet5/main/installer_xmlupdatebyiet5_auto.sh" | /bin/sh
 #
 # Alternative:
-# wget -O /tmp/installer_cutsclear_auto.sh "https://raw.githubusercontent.com/Saiedf/CutsClear/main/installer_cutsclear_auto.sh" && chmod 755 /tmp/installer_cutsclear_auto.sh && /bin/sh /tmp/installer_cutsclear_auto.sh
+# wget -O /tmp/installer_xmlupdatebyiet5_auto.sh "https://raw.githubusercontent.com/Saiedf/XMLUpdateByIet5/main/installer_xmlupdatebyiet5_auto.sh" && chmod 755 /tmp/installer_xmlupdatebyiet5_auto.sh && /bin/sh /tmp/installer_xmlupdatebyiet5_auto.sh
 # ==========================================================
 
-PACKAGE_NAME='enigma2-plugin-extensions-cutsclear'
-LEGACY_PACKAGE_NAME=''
-PLUGIN_TITLE='CutsClear'
-PLUGIN_FOLDER='CutsClear'
+PACKAGE_NAME='enigma2-plugin-extensions-xmlupdatebyiet5'
+LEGACY_PACKAGE_NAME='enigma2-plugin-extensions-XMLUpdateByIet5'
+PLUGIN_TITLE='XMLUpdateByIet5'
+PLUGIN_FOLDER='XMLUpdateByIet5'
 
 REPO_USER='Saiedf'
-REPO_NAME='CutsClear'
+REPO_NAME='XMLUpdateByIet5'
 REPO_BRANCH='main'
 
-VERSION_FILE_PATH='CutsClear/ver.txt'
-RELEASES_DIR='CutsClear/Releases'
+# Adjust once only if your GitHub layout is different
+VERSION_FILE_PATH='ver.txt'
+RELEASES_DIR='Releases'
 
 DEB_DM920_PY2=''
 DEB_DM920_PY3=''
