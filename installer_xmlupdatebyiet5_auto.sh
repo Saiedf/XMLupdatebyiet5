@@ -23,6 +23,9 @@ LEGACY_PACKAGE_NAME='enigma2-plugin-extensions-XMLUpdateByIet5'
 PLUGIN_TITLE='XMLUpdateByIet5'
 PLUGIN_FOLDER='XMLUpdateByIet5'
 
+# Time to keep the success message visible before restarting Enigma2
+INSTALL_SUCCESS_WAIT='12'
+
 REPO_USER='Saiedf'
 REPO_NAME='XMLUpdateByIet5'
 REPO_BRANCH='main'
@@ -609,20 +612,23 @@ install_package() {
 
 show_install_success_message() {
     MSG_TITLE="$PLUGIN_TITLE"
+    MSG_TEXT="$PLUGIN_TITLE version $PLUGIN_VERSION has been installed successfully. Enigma2 will restart after $INSTALL_SUCCESS_WAIT seconds."
 
     say ''
     say '============================================================='
-    say " $PLUGIN_TITLE has been installed successfully."
+    say " INSTALLED SUCCESSFULLY"
+    say " Plugin : $PLUGIN_TITLE"
     say " Version: $PLUGIN_VERSION"
-    say ' Enigma2 will restart now.'
+    say " Enigma2 will restart after $INSTALL_SUCCESS_WAIT seconds."
     say '============================================================='
     say ''
 
     # OpenATV / OpenPLI / OpenVision / many OE images with WebInterface
+    # This shows a visible message on the TV screen before restarting the GUI.
     if have wget; then
-        wget -qO- "http://127.0.0.1/web/message?text=$PLUGIN_TITLE%20version%20$PLUGIN_VERSION%20has%20been%20installed%20successfully.%0AEnigma2%20will%20restart%20now.&type=1&timeout=8" >/dev/null 2>&1
+        wget -qO- "http://127.0.0.1/web/message?text=$PLUGIN_TITLE%20version%20$PLUGIN_VERSION%20has%20been%20installed%20successfully.%0AEnigma2%20will%20restart%20after%20$INSTALL_SUCCESS_WAIT%20seconds.&type=1&timeout=$INSTALL_SUCCESS_WAIT" >/dev/null 2>&1
     elif have curl; then
-        curl -fs "http://127.0.0.1/web/message?text=$PLUGIN_TITLE%20version%20$PLUGIN_VERSION%20has%20been%20installed%20successfully.%0AEnigma2%20will%20restart%20now.&type=1&timeout=8" >/dev/null 2>&1
+        curl -fs "http://127.0.0.1/web/message?text=$PLUGIN_TITLE%20version%20$PLUGIN_VERSION%20has%20been%20installed%20successfully.%0AEnigma2%20will%20restart%20after%20$INSTALL_SUCCESS_WAIT%20seconds.&type=1&timeout=$INSTALL_SUCCESS_WAIT" >/dev/null 2>&1
     fi
 
     # DreamOS / Dreambox images when dbus notifications are available
@@ -632,12 +638,13 @@ show_install_success_message() {
             /org/freedesktop/Notifications \
             org.freedesktop.Notifications.Notify \
             string:"$MSG_TITLE" uint32:0 string:"" \
-            string:"Installation completed" \
-            string:"$PLUGIN_TITLE version $PLUGIN_VERSION has been installed successfully. Enigma2 will restart now." \
-            array:string: dict:string:variant: int32:8000 >/dev/null 2>&1
+            string:"Installed successfully" \
+            string:"$MSG_TEXT" \
+            array:string: dict:string:variant: int32:12000 >/dev/null 2>&1
     fi
 
-    sleep 8
+    # Keep the success message visible before restarting Enigma2.
+    sleep "$INSTALL_SUCCESS_WAIT"
 }
 
 restart_enigma2() {
