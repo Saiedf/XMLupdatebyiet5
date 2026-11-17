@@ -1,33 +1,29 @@
 #!/bin/sh
-
-#Script created by iet5
+# Script created by iet5
 #
 # ==========================================================
 # SCRIPT : DOWNLOAD AND INSTALL ENIGMA2 PLUGIN
-# Plugin   : XMLUpdateByIet5
+# Plugin   : XMLupdatebyiet5
 # Notes    : This installer automatically reads the latest
 #            version from ver.txt and installs the matching
 #            package without editing this script each release.
 #            Old version removal is automatic with no prompt.
 # ==========================================================
 #
-# Example run:
-# wget -qO- "https://raw.githubusercontent.com/Saiedf/XMLUpdateByIet5/main/installer_xmlupdatebyiet5_auto.sh" | /bin/sh
+# One-command installation:
+# wget -qO- "https://raw.githubusercontent.com/Saiedf/XMLupdatebyiet5/main/installer_xmlupdatebyiet5_auto.sh?nocache=$(date +%s)" | /bin/sh
 #
 # Alternative:
-# wget -O /tmp/installer_xmlupdatebyiet5_auto.sh "https://raw.githubusercontent.com/Saiedf/XMLUpdateByIet5/main/installer_xmlupdatebyiet5_auto.sh" && chmod 755 /tmp/installer_xmlupdatebyiet5_auto.sh && /bin/sh /tmp/installer_xmlupdatebyiet5_auto.sh
+# wget -O /tmp/installer_xmlupdatebyiet5_auto.sh "https://raw.githubusercontent.com/Saiedf/XMLupdatebyiet5/main/installer_xmlupdatebyiet5_auto.sh?nocache=$(date +%s)" && chmod 755 /tmp/installer_xmlupdatebyiet5_auto.sh && /bin/sh /tmp/installer_xmlupdatebyiet5_auto.sh
 # ==========================================================
 
 PACKAGE_NAME='enigma2-plugin-extensions-xmlupdatebyiet5'
-LEGACY_PACKAGE_NAME='enigma2-plugin-extensions-XMLUpdateByIet5'
-PLUGIN_TITLE='XMLUpdateByIet5'
-PLUGIN_FOLDER='XMLUpdateByIet5'
-
-# Time to keep the success message visible before restarting Enigma2
-INSTALL_SUCCESS_WAIT='12'
+LEGACY_PACKAGE_NAME='enigma2-plugin-extensions-xmlupdatebyiet5'
+PLUGIN_TITLE='XMLupdatebyiet5'
+PLUGIN_FOLDER='XMLupdatebyiet5'
 
 REPO_USER='Saiedf'
-REPO_NAME='XMLUpdateByIet5'
+REPO_NAME='XMLupdatebyiet5'
 REPO_BRANCH='main'
 
 # Adjust once only if your GitHub layout is different
@@ -83,34 +79,64 @@ trim() {
 }
 
 read_first_line() {
-    for f in "$@"; do
-        if [ -r "$f" ]; then
-            sed -n '1p' "$f"
-            return 0
-        fi
-    done
-    return 1
+    [ -r "$1" ] || return 0
+    sed -n '1p' "$1" 2>/dev/null | tr -d '\r'
 }
 
 download_to_stdout() {
-    URL="$1"
-
+    FETCH_URL="$1"
     if have wget; then
-        wget -qO- "$URL"
-        return $?
+        wget -T 20 -t 2 -qO- "$FETCH_URL"
+    elif have curl; then
+        curl -fsSL --connect-timeout 15 --max-time 60 --retry 2 "$FETCH_URL"
+    else
+        return 1
     fi
+}
 
-    if have curl; then
-        curl -fsL "$URL"
-        return $?
+validate_package() {
+    [ -s "$MY_TMP_FILE" ] || return 1
+    if [ "$PKG_TYPE" = 'ipk' ]; then
+        [ "$(head -c 7 "$MY_TMP_FILE" 2>/dev/null)" = '!<arch>' ] || return 1
+        if have ar && have tar; then
+            CONTROL_DIR="/tmp/alternativesoftcammanager_control_$$"
+            mkdir -p "$CONTROL_DIR" || return 1
+            CONTROL_ARCHIVE=$(ar t "$MY_TMP_FILE" 2>/dev/null | grep '^control.tar' | head -n 1)
+            [ -n "$CONTROL_ARCHIVE" ] || { rm -rf "$CONTROL_DIR"; return 1; }
+            ar p "$MY_TMP_FILE" "$CONTROL_ARCHIVE" > "$CONTROL_DIR/$CONTROL_ARCHIVE" || { rm -rf "$CONTROL_DIR"; return 1; }
+            case "$CONTROL_ARCHIVE" in
+                *.gz) tar -xzf "$CONTROL_DIR/$CONTROL_ARCHIVE" -C "$CONTROL_DIR" ./control 2>/dev/null || tar -xzf "$CONTROL_DIR/$CONTROL_ARCHIVE" -C "$CONTROL_DIR" control 2>/dev/null ;;
+                *.xz) tar -xJf "$CONTROL_DIR/$CONTROL_ARCHIVE" -C "$CONTROL_DIR" ./control 2>/dev/null || tar -xJf "$CONTROL_DIR/$CONTROL_ARCHIVE" -C "$CONTROL_DIR" control 2>/dev/null ;;
+                *) rm -rf "$CONTROL_DIR"; return 1 ;;
+            esac
+            [ -f "$CONTROL_DIR/control" ] || { rm -rf "$CONTROL_DIR"; return 1; }
+            CONTROL_NAME=$(sed -n 's/^Package: *//p' "$CONTROL_DIR/control" | head -n 1)
+            CONTROL_VERSION=$(sed -n 's/^Version: *//p' "$CONTROL_DIR/control" | head -n 1)
+            CONTROL_ARCH=$(sed -n 's/^Architecture: *//p' "$CONTROL_DIR/control" | head -n 1)
+            rm -rf "$CONTROL_DIR"
+            [ "$CONTROL_NAME" = "$PACKAGE_NAME" ] || return 1
+            [ "$CONTROL_VERSION" = "$PLUGIN_VERSION" ] || return 1
+            [ "$CONTROL_ARCH" = 'all' ] || [ "$CONTROL_ARCH" = "$ARCH" ] || return 1
+        fi
+        return 0
     fi
-
-    return 1
+    have dpkg-deb || return 1
+    dpkg-deb --info "$MY_TMP_FILE" >/dev/null 2>&1 || return 1
+    DOWNLOADED_NAME=$(dpkg-deb -f "$MY_TMP_FILE" Package 2>/dev/null) || return 1
+    DOWNLOADED_VERSION=$(dpkg-deb -f "$MY_TMP_FILE" Version 2>/dev/null) || return 1
+    DOWNLOADED_ARCH=$(dpkg-deb -f "$MY_TMP_FILE" Architecture 2>/dev/null) || return 1
+    [ "$DOWNLOADED_NAME" = "$PACKAGE_NAME" ] || return 1
+    [ "$DOWNLOADED_VERSION" = "$PLUGIN_VERSION" ] || return 1
+    [ "$DOWNLOADED_ARCH" = 'all' ] || [ "$DOWNLOADED_ARCH" = "$ARCH" ] || return 1
+    return 0
 }
 
 fetch_version() {
-    VERSION_URL="https://raw.githubusercontent.com/$REPO_USER/$REPO_NAME/$REPO_BRANCH/$VERSION_FILE_PATH"
-    VERSION_RAW=$(download_to_stdout "$VERSION_URL" 2>/dev/null | sed -n '1p')
+    VERSION_URL="https://raw.githubusercontent.com/$REPO_USER/$REPO_NAME/$REPO_BRANCH/$VERSION_FILE_PATH?nocache=$(date +%s)"
+    VERSION_TMP="/tmp/alternativesoftcammanager_version_$$.txt"
+    download_to_stdout "$VERSION_URL" > "$VERSION_TMP" || { rm -f "$VERSION_TMP"; return 1; }
+    VERSION_RAW=$(sed -n '1p' "$VERSION_TMP")
+    rm -f "$VERSION_TMP"
     VERSION_RAW=$(trim "$VERSION_RAW")
 
     if [ -z "$VERSION_RAW" ]; then
@@ -120,9 +146,7 @@ fetch_version() {
     # Accept versions like: 3.4, 3.4A, 3.4a, 3.4-beta, 3.4_1
     # Reject only unsafe characters, spaces, slashes, or empty values.
     case "$VERSION_RAW" in
-        *[!0-9A-Za-z._-]*|.*|-*|_*|*/*|*\\*|*[[:space:]]*)
-            return 1
-            ;;
+        ''|*[!0-9A-Za-z._-]*|.*|-*|_*|*/*|*\\*|*[[:space:]]*) return 1 ;;
     esac
 
     printf '%s' "$VERSION_RAW"
@@ -188,7 +212,7 @@ detect_device_family() {
 detect_arch() {
     ARCH=''
 
-    if have dpkg; then
+    if have dpkg && ! have opkg; then
         ARCH=$(dpkg --print-architecture 2>/dev/null)
     fi
 
@@ -196,6 +220,7 @@ detect_arch() {
         ARCH=$(opkg print-architecture 2>/dev/null | awk '{print $2}' | tail -n 1)
     fi
 
+    [ -z "$ARCH" ] && have dpkg && ARCH=$(dpkg --print-architecture 2>/dev/null)
     [ -z "$ARCH" ] && ARCH=$(uname -m 2>/dev/null)
     [ -z "$ARCH" ] && ARCH='unknown'
 
@@ -203,11 +228,11 @@ detect_arch() {
 }
 
 detect_python_cmd() {
-    if have python3; then
+    if have python3 && [ -x "$(command -v python3)" ]; then
         echo 'python3'
         return 0
     fi
-    if have python2; then
+    if have python2 && [ -x "$(command -v python2)" ]; then
         echo 'python2'
         return 0
     fi
@@ -386,7 +411,7 @@ pick_ipk_file() {
 
 build_url() {
     BASE_URL="https://raw.githubusercontent.com/$REPO_USER/$REPO_NAME/$REPO_BRANCH/$RELEASES_DIR"
-    PKG_URL="$BASE_URL/$PKG_FILE"
+    PKG_URL="$BASE_URL/$PKG_FILE?nocache=$(date +%s)"
 }
 
 has_deb_support() {
@@ -563,12 +588,12 @@ download_package() {
     rm -f "$MY_TMP_FILE" >/dev/null 2>&1
 
     if have wget; then
-        wget -T 20 -O "$MY_TMP_FILE" "$PKG_URL"
+        wget -T 20 -t 2 -O "$MY_TMP_FILE" "$PKG_URL"
         return $?
     fi
 
     if have curl; then
-        curl -L --connect-timeout 20 -o "$MY_TMP_FILE" "$PKG_URL"
+        curl -fSL --connect-timeout 20 --max-time 180 --retry 2 -o "$MY_TMP_FILE" "$PKG_URL"
         return $?
     fi
 
@@ -581,12 +606,12 @@ install_package() {
         if have dpkg; then
             dpkg -i --force-overwrite "$MY_TMP_FILE"
             INSTALL_RET=$?
-            if have apt-get; then
-                apt-get install -f -y >/dev/null 2>&1
-            elif have apt; then
-                apt install -f -y >/dev/null 2>&1
+            if [ "$INSTALL_RET" -ne 0 ] && have apt-get; then
+                apt-get install -f -y || return 1
+                dpkg -i "$MY_TMP_FILE" || return 1
+                INSTALL_RET=0
             fi
-            return $INSTALL_RET
+            return "$INSTALL_RET"
         fi
 
         if have apt-get; then
@@ -612,23 +637,20 @@ install_package() {
 
 show_install_success_message() {
     MSG_TITLE="$PLUGIN_TITLE"
-    MSG_TEXT="$PLUGIN_TITLE version $PLUGIN_VERSION has been installed successfully. Enigma2 will restart after $INSTALL_SUCCESS_WAIT seconds."
 
     say ''
     say '============================================================='
-    say " INSTALLED SUCCESSFULLY"
-    say " Plugin : $PLUGIN_TITLE"
+    say " $PLUGIN_TITLE has been installed successfully."
     say " Version: $PLUGIN_VERSION"
-    say " Enigma2 will restart after $INSTALL_SUCCESS_WAIT seconds."
+    say ' Enigma2 will restart now.'
     say '============================================================='
     say ''
 
     # OpenATV / OpenPLI / OpenVision / many OE images with WebInterface
-    # This shows a visible message on the TV screen before restarting the GUI.
     if have wget; then
-        wget -qO- "http://127.0.0.1/web/message?text=$PLUGIN_TITLE%20version%20$PLUGIN_VERSION%20has%20been%20installed%20successfully.%0AEnigma2%20will%20restart%20after%20$INSTALL_SUCCESS_WAIT%20seconds.&type=1&timeout=$INSTALL_SUCCESS_WAIT" >/dev/null 2>&1
+        wget -qO- "http://127.0.0.1/web/message?text=$PLUGIN_TITLE%20version%20$PLUGIN_VERSION%20has%20been%20installed%20successfully.%0AEnigma2%20will%20restart%20now.&type=1&timeout=8" >/dev/null 2>&1
     elif have curl; then
-        curl -fs "http://127.0.0.1/web/message?text=$PLUGIN_TITLE%20version%20$PLUGIN_VERSION%20has%20been%20installed%20successfully.%0AEnigma2%20will%20restart%20after%20$INSTALL_SUCCESS_WAIT%20seconds.&type=1&timeout=$INSTALL_SUCCESS_WAIT" >/dev/null 2>&1
+        curl -fs "http://127.0.0.1/web/message?text=$PLUGIN_TITLE%20version%20$PLUGIN_VERSION%20has%20been%20installed%20successfully.%0AEnigma2%20will%20restart%20now.&type=1&timeout=8" >/dev/null 2>&1
     fi
 
     # DreamOS / Dreambox images when dbus notifications are available
@@ -638,13 +660,12 @@ show_install_success_message() {
             /org/freedesktop/Notifications \
             org.freedesktop.Notifications.Notify \
             string:"$MSG_TITLE" uint32:0 string:"" \
-            string:"Installed successfully" \
-            string:"$MSG_TEXT" \
-            array:string: dict:string:variant: int32:12000 >/dev/null 2>&1
+            string:"Installation completed" \
+            string:"$PLUGIN_TITLE version $PLUGIN_VERSION has been installed successfully. Enigma2 will restart now." \
+            array:string: dict:string:variant: int32:8000 >/dev/null 2>&1
     fi
 
-    # Keep the success message visible before restarting Enigma2.
-    sleep "$INSTALL_SUCCESS_WAIT"
+    sleep 8
 }
 
 restart_enigma2() {
@@ -670,7 +691,7 @@ PLUGIN_VERSION=$(fetch_version)
 if [ $? -ne 0 ] || [ -z "$PLUGIN_VERSION" ]; then
     say ''
     say 'Failed to read version from ver.txt'
-    say "URL: https://raw.githubusercontent.com/$REPO_USER/$REPO_NAME/$REPO_BRANCH/$VERSION_FILE_PATH"
+    say "URL: $VERSION_URL"
     exit 1
 fi
 
@@ -736,7 +757,7 @@ say "** Package file  : $PKG_FILE"
 say '************************************************************'
 say ''
 
-confirm_old_version_removal
+# Old version is retained until the new package has been downloaded and validated.
 
 rm -f "$MY_TMP_FILE" >/dev/null 2>&1
 
@@ -752,22 +773,30 @@ DOWNLOAD_RET=$?
 if [ $DOWNLOAD_RET -eq 0 ] && [ -s "$MY_TMP_FILE" ]; then
     say ''
     say "$MY_SEP"
+    if ! validate_package; then
+        say 'Package validation failed. Existing installation was not removed.'
+        rm -f "$MY_TMP_FILE"
+        exit 1
+    fi
     say 'Installation started'
     say "$MY_SEP"
     say ''
 
+    # Upgrade in place: package manager preserves the installed version until installation.
+    # Do not delete plugin directories manually before a verified installation.
     install_package
     MY_RESULT=$?
 
     say ''
     say ''
-    if [ $MY_RESULT -eq 0 ]; then
+    if [ "$MY_RESULT" -eq 0 ] && check_installed_package_name "$PACKAGE_NAME"; then
         say '>>>> SUCCESSFULLY INSTALLED <<<<'
         show_install_success_message
         say ''
         say '>>>> RESTARTING ENIGMA2    <<<<'
         restart_enigma2
     else
+        MY_RESULT=1
         say '>>>> INSTALLATION FAILED! <<<<'
     fi
     say ''
@@ -775,7 +804,8 @@ if [ $DOWNLOAD_RET -eq 0 ] && [ -s "$MY_TMP_FILE" ]; then
     say '**                   FINISHED                   **'
     say '**************************************************'
     say ''
-    exit $MY_RESULT
+    rm -f "$MY_TMP_FILE"
+    exit "$MY_RESULT"
 else
     say ''
     say 'Download failed!'
