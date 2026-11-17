@@ -99,7 +99,7 @@ validate_package() {
     if [ "$PKG_TYPE" = 'ipk' ]; then
         [ "$(head -c 7 "$MY_TMP_FILE" 2>/dev/null)" = '!<arch>' ] || return 1
         if have ar && have tar; then
-            CONTROL_DIR="/tmp/alternativesoftcammanager_control_$$"
+            CONTROL_DIR="/tmp/xmlupdatebyiet5_control_$$"
             mkdir -p "$CONTROL_DIR" || return 1
             CONTROL_ARCHIVE=$(ar t "$MY_TMP_FILE" 2>/dev/null | grep '^control.tar' | head -n 1)
             [ -n "$CONTROL_ARCHIVE" ] || { rm -rf "$CONTROL_DIR"; return 1; }
@@ -132,9 +132,10 @@ validate_package() {
 }
 
 fetch_version() {
-    VERSION_URL="https://raw.githubusercontent.com/$REPO_USER/$REPO_NAME/$REPO_BRANCH/$VERSION_FILE_PATH?nocache=$(date +%s)"
-    VERSION_TMP="/tmp/alternativesoftcammanager_version_$$.txt"
-    download_to_stdout "$VERSION_URL" > "$VERSION_TMP" || { rm -f "$VERSION_TMP"; return 1; }
+    FETCH_VERSION_URL="$1"
+    [ -n "$FETCH_VERSION_URL" ] || return 1
+    VERSION_TMP="/tmp/xmlupdatebyiet5_version_$$.txt"
+    download_to_stdout "$FETCH_VERSION_URL" > "$VERSION_TMP" || { rm -f "$VERSION_TMP"; return 1; }
     VERSION_RAW=$(sed -n '1p' "$VERSION_TMP")
     rm -f "$VERSION_TMP"
     VERSION_RAW=$(trim "$VERSION_RAW")
@@ -163,9 +164,10 @@ detect_image_type() {
 
     INFO=$(to_lower "$INFO")
 
+    # Check explicit image names before Dreambox/OE markers. Some third-party
+    # images run on Dreambox hardware and may also contain "dreambox" or
+    # "oe2.5/oe2.6" in their identification files.
     case "$INFO" in
-        *dreambox*|*dreamos*|*oe2.5*|*oe2.6*) echo 'dreamos' ;;
-        *vti*) echo 'vti' ;;
         *openatv*) echo 'openatv' ;;
         *openpli*) echo 'openpli' ;;
         *openspa*) echo 'openspa' ;;
@@ -176,6 +178,8 @@ detect_image_type() {
         *egami*) echo 'egami' ;;
         *teamblue*) echo 'teamblue' ;;
         *pure2*) echo 'pure2' ;;
+        *vti*) echo 'vti' ;;
+        *dreamos*|*dreambox*|*oe2.5*|*oe2.6*) echo 'dreamos' ;;
         *)
             if have dpkg; then
                 echo 'dreamos'
@@ -687,7 +691,8 @@ PYTHON_CMD=$(detect_python_cmd)
 PYTHON_SERIES=$(detect_python_series)
 PYTHON_VERSION=$(detect_python_version)
 
-PLUGIN_VERSION=$(fetch_version)
+VERSION_URL="https://raw.githubusercontent.com/$REPO_USER/$REPO_NAME/$REPO_BRANCH/$VERSION_FILE_PATH?nocache=$(date +%s)"
+PLUGIN_VERSION=$(fetch_version "$VERSION_URL")
 if [ $? -ne 0 ] || [ -z "$PLUGIN_VERSION" ]; then
     say ''
     say 'Failed to read version from ver.txt'
